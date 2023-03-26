@@ -4,20 +4,21 @@ import openpyxl
 import requests
 import json
 from openpyxl.workbook import Workbook
+import tkinter as tk
 
 webhookUrl='https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0913301-02c8-4f07-be0c-37380ea7828b'#调试
-key='b0913301-02c8-4f07-be0c-37380ea7828b'
+key='b0913301-02c8-4f07-be0c-37380ea7828b'#调试
 
 #发送文件到企业微信
-def wx_post():
+def wx_post(key):
     #上传文件
-    id_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/upload_media?key=b0913301-02c8-4f07-be0c-37380ea7828b&type=file'  # 上传文件接口地址
+    id_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/upload_media?key='+key+'&type=file'  # 上传文件接口地址
     data = {'file': open('domain.xlsx', 'rb')}
     response = requests.post(url=id_url, files=data)
     json_res = response.json()
     #发送文件
     media_id = json_res['media_id']  # 提取返回ID
-    wx_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0913301-02c8-4f07-be0c-37380ea7828b'  # 发送消息接口地址
+    wx_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key='+key  # 发送消息接口地址
     data = {"msgtype": "file", "file": {"media_id": media_id}}
     r = requests.post(url=wx_url, json=data)
     return r
@@ -26,6 +27,7 @@ def wx_post():
 def open_txt():
     domains=[]
     file=open('domaintest.txt','r',encoding='utf-8')
+    # file=open('domain.txt','r',encoding='utf-8')
     file_data=file.readlines()
     for row in file_data:
         tmp_list=row.split('.')
@@ -69,12 +71,14 @@ def json_parse(res,domain):
 
 #将域名信息整理成列表
 def list_domain(domain,domain_match,creation_data,registry_expiry_date):
+    #存放已注册信息
     if domain_match == '已注册':
         match_info.append(domain)
         match_info.append(domain_match)
         match_info.append(creation_data)
         match_info.append(registry_expiry_date)
         match_infos.append(match_info)
+    #存放无注册信息
     else:
         nomatch_info.append(domain)
         nomatch_info.append(domain_match)
@@ -89,8 +93,6 @@ def save_domian(match_infos,nomatch_infos):
     wb=Workbook()
     ws=wb.active
     ws.title=u'已注册信息列表'
-    print(match_infos)
-    print(nomatch_infos)
     r=1
     for line in match_infos:
         for col in range(1, len(line) + 1):
@@ -106,6 +108,7 @@ def save_domian(match_infos,nomatch_infos):
     wb.close()
 
 if __name__ == '__main__':
+    root=tk.Tk()
     domains=open_txt()
     match_info=[]
     match_infos=[]
@@ -120,4 +123,5 @@ if __name__ == '__main__':
         match_info = []
         nomatch_info = []
     save_domian(match_infos,nomatch_infos)
-    # wx_post()
+    # wx_post(key)
+    root.mainloop()

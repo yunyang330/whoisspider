@@ -121,7 +121,7 @@ if __name__ == '__main__':
         match_infos,nomatch_infos=list_domain(domain,domain_match,creation_data,registry_expiry_date)
         match_info = []
         nomatch_info = []
-        print(r)
+        print("已搜索{}条域名，请勿中途关闭".format(r))
         r+=1
     save_domian(match_infos,nomatch_infos)
-    wx_post(key)
+    # wx_post(key)
