@@ -59,7 +59,13 @@ def url_get(domain):
     #发送get请求
     url = "https://api.knet.cn/whois"
     parmas={"domain":keyword}
-    response=requests.get(url=url,headers=headers,params=parmas,proxies=proxies)
+    try:
+        response=requests.get(url=url,headers=headers,params=parmas,proxies=proxies)
+    except:
+        while True:
+            response = requests.get(url=url, headers=headers, params=parmas, proxies=proxies)
+            if response.status_code == 200:
+                break
     res=response.text
     print(res)
     return res
