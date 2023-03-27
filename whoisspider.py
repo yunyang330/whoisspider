@@ -5,6 +5,8 @@ import openpyxl
 import requests
 import json
 from openpyxl.workbook import Workbook
+import multiprocessing
+
 
 webhookUrl='https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0913301-02c8-4f07-be0c-37380ea7828b'#调试
 key='b0913301-02c8-4f07-be0c-37380ea7828b'#调试
@@ -67,7 +69,6 @@ def url_get(domain):
             if response.status_code == 200:
                 break
     res=response.text
-    print(res)
     return res
 
 #解析接口返回的json数据
@@ -89,7 +90,7 @@ def json_parse(res,domain):
     return domain_match,creation_data,registry_expiry_date
 
 #将域名信息整理成列表
-def list_domain(domain,domain_match,creation_data,registry_expiry_date):
+def list_domain(domain,domain_match,creation_data,registry_expiry_date,match_infos,nomatch_infos):
     #存放已注册信息
     match_info=[]
     nomatch_info=[]
@@ -127,22 +128,26 @@ def save_domian(match_infos,nomatch_infos):
     wb.save('domain.xlsx')
     wb.close()
 
-def main(domains,match_infos,nomatch_infos):
-    match_infos.append(['域名', '域名状态', '注册时间', '到期时间'])
-    nomatch_infos.append(['域名', '域名状态', '注册时间', '到期时间'])
+#爬虫主程序
+def main(domains,match_infos=[],nomatch_infos=[]):
     r = 1
     for domain in domains:
         res = url_get(domain)
         domain_match, creation_data, registry_expiry_date = json_parse(res, domain)
-        match_infos, nomatch_infos = list_domain(domain, domain_match, creation_data, registry_expiry_date)
+        match_infos, nomatch_infos = list_domain(domain, domain_match, creation_data, registry_expiry_date,match_infos,nomatch_infos)
         print("已搜索{}条域名，请勿中途关闭".format(r))
         r += 1
     return match_infos,nomatch_infos
 
+
 if __name__ == '__main__':
     domains=open_txt()
-    match_infos=[]
-    nomatch_infos=[]
-    match_infos,nomatch_infos=main(domains,match_infos,nomatch_infos)
+    match_infos = []
+    nomatch_infos = []
+    #多进程运行
+    with multiprocessing.Pool(processes=4) as pool:
+        result=pool.map(main,[domains])[0]
+    match_infos=result[0]
+    nomatch_infos=result[1]
     save_domian(match_infos,nomatch_infos)
     # wx_post(key)
