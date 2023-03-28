@@ -52,7 +52,8 @@ def url_get(domain):
     # 设置请求头，模拟浏览器访问
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
-        "Connection":"close"
+        "Connection":"close",
+        'Accept-Encoding': 'gzip'
     }
 
     #搜索关键词
@@ -69,6 +70,7 @@ def url_get(domain):
             if response.status_code == 200:
                 break
     res=response.text
+    print(res)
     return res
 
 #解析接口返回的json数据
