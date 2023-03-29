@@ -11,17 +11,6 @@ import multiprocessing
 webhookUrl='https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0913301-02c8-4f07-be0c-37380ea7828b'#调试
 key='b0913301-02c8-4f07-be0c-37380ea7828b'#调试
 
-#使用代理ip
-tunnel="tps827.kdlapi.com:15818"
-
-# 用户名密码认证(私密代理/独享代理)
-username = "t15114368670956"
-password = "jbyb1vkl"
-proxies = {
-    "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
-    "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
-}
-
 #发送文件到企业微信
 def wx_post(key):
     #上传文件
@@ -49,6 +38,16 @@ def open_txt():
 
 #调用搜索接口
 def url_get(domain):
+    # 使用代理ip
+    tunnel = "tps827.kdlapi.com:15818"
+
+    # 用户名密码认证(私密代理/独享代理)
+    username = "t15114368670956"
+    password = "jbyb1vkl"
+    proxies = {
+        "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
+        "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
+    }
     # 设置请求头，模拟浏览器访问
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
@@ -66,11 +65,15 @@ def url_get(domain):
         response=requests.get(url=url,headers=headers,params=parmas,proxies=proxies)
     except:
         while True:
+            proxies = {
+                "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
+                "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
+            }
             response = requests.get(url=url, headers=headers, params=parmas, proxies=proxies)
             if response.status_code == 200:
                 break
     res=response.text
-    print(res)
+    response.keep_alive=False
     return res
 
 #解析接口返回的json数据
@@ -90,26 +93,6 @@ def json_parse(res,domain):
     else:
         domain_match='无注册信息'
     return domain_match,creation_data,registry_expiry_date
-
-#将域名信息整理成列表
-def list_domain(domain,domain_match,creation_data,registry_expiry_date,match_infos,nomatch_infos):
-    #存放已注册信息
-    match_info=[]
-    nomatch_info=[]
-    if domain_match == '已注册':
-        match_info.append(domain)
-        match_info.append(domain_match)
-        match_info.append(creation_data)
-        match_info.append(registry_expiry_date)
-        match_infos.append(match_info)
-    #存放无注册信息
-    else:
-        nomatch_info.append(domain)
-        nomatch_info.append(domain_match)
-        nomatch_info.append(creation_data)
-        nomatch_info.append(registry_expiry_date)
-        nomatch_infos.append(nomatch_info)
-    return match_infos,nomatch_infos
 
 #将域名信息存入表格
 def save_domian(match_infos,nomatch_infos):
@@ -131,25 +114,41 @@ def save_domian(match_infos,nomatch_infos):
     wb.close()
 
 #爬虫主程序
-def main(domains,match_infos=[],nomatch_infos=[]):
-    r = 1
-    for domain in domains:
-        res = url_get(domain)
-        domain_match, creation_data, registry_expiry_date = json_parse(res, domain)
-        match_infos, nomatch_infos = list_domain(domain, domain_match, creation_data, registry_expiry_date,match_infos,nomatch_infos)
-        print("已搜索{}条域名，请勿中途关闭".format(r))
-        r += 1
-    return match_infos,nomatch_infos
-
+def main(domain):
+    res = url_get(domain)
+    domain_match, creation_data, registry_expiry_date = json_parse(res, domain)
+    #将域名信息整理成列表
+    match_info = []
+    nomatch_info = []
+    if domain_match == '已注册':
+        match_info.append(domain)
+        match_info.append(domain_match)
+        match_info.append(creation_data)
+        match_info.append(registry_expiry_date)
+    # 存放无注册信息
+    else:
+        nomatch_info.append(domain)
+        nomatch_info.append(domain_match)
+        nomatch_info.append(creation_data)
+        nomatch_info.append(registry_expiry_date)
+    print("已查询域名：{}.网址".format(domain))
+    return match_info,nomatch_info
 
 if __name__ == '__main__':
-    domains=open_txt()
     match_infos = []
     nomatch_infos = []
+    domains=open_txt()
     #多进程运行
-    with multiprocessing.Pool(processes=4) as pool:
-        result=pool.map(main,[domains])[0]
-    match_infos=result[0]
-    nomatch_infos=result[1]
-    save_domian(match_infos,nomatch_infos)
-    # wx_post(key)
+    with multiprocessing.Pool(processes=8) as pool:
+        results = pool.map(main,domains)
+        result1 = [r[0] for r in results]
+        result2 = [r[1] for r in results]
+        #删除列表中的[]
+        for match_info in result1:
+            if match_info != []:
+                match_infos.append(match_info)
+        for nomatch_info in result2:
+            if nomatch_info != []:
+                nomatch_infos.append(nomatch_info)
+        save_domian(match_infos,nomatch_infos)
+    # wx_post(key)53
