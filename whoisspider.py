@@ -1,5 +1,6 @@
 #读取文件中的域名并查询相关的域名信息
 #***************************************
+import time
 from time import sleep
 import openpyxl
 import requests
@@ -7,6 +8,9 @@ import json
 from openpyxl.workbook import Workbook
 import multiprocessing
 
+max_retries=999999 #最大重试次数
+retry_interval=1 #失败重试间隔
+timeout=10 #请求超时
 
 webhookUrl='https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0913301-02c8-4f07-be0c-37380ea7828b'#调试
 key='b0913301-02c8-4f07-be0c-37380ea7828b'#调试
@@ -44,10 +48,10 @@ def url_get(domain):
     # 用户名密码认证(私密代理/独享代理)
     username = "t15114368670956"
     password = "jbyb1vkl"
-    proxies = {
-        "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
-        "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
-    }
+    # proxies = {
+    #     "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
+    #     "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
+    # }
     # 设置请求头，模拟浏览器访问
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
@@ -61,17 +65,28 @@ def url_get(domain):
     #发送get请求
     url = "https://api.knet.cn/whois"
     parmas={"domain":keyword}
-    try:
-        response=requests.get(url=url,headers=headers,params=parmas,proxies=proxies)
-    except:
-        while True:
+    retry_count=0
+    while True:
+        try:
             proxies = {
                 "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
                 "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
             }
-            response = requests.get(url=url, headers=headers, params=parmas, proxies=proxies)
+            response = requests.get(url=url, headers=headers, params=parmas, proxies=proxies,timeout=timeout)
             if response.status_code == 200:
                 break
+            else:
+                retry_count += 1
+                if retry_count > max_retries:
+                    raise Exception("接口访问超过最大重试次数")
+        except Exception as e:
+            retry_count += 1
+            if retry_count > max_retries:
+                raise Exception("接口访问超过最大重试次数")
+            else:
+                # print(f"请求接口出错，错误信息为：{e}")
+                time.sleep(retry_interval)  # 等待重试间隔后再次尝试请求
+
     res=response.text
     response.keep_alive=False
     return res
@@ -135,11 +150,12 @@ def main(domain):
     return match_info,nomatch_info
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     match_infos = []
     nomatch_infos = []
     domains=open_txt()
     #多进程运行
-    with multiprocessing.Pool(processes=8) as pool:
+    with multiprocessing.Pool(processes=40) as pool:
         results = pool.map(main,domains)
         result1 = [r[0] for r in results]
         result2 = [r[1] for r in results]
@@ -150,5 +166,7 @@ if __name__ == '__main__':
         for nomatch_info in result2:
             if nomatch_info != []:
                 nomatch_infos.append(nomatch_info)
-        save_domian(match_infos,nomatch_infos)
-    # wx_post(key)53
+    pool.close()
+    pool.join()
+    save_domian(match_infos,nomatch_infos)
+    # wx_post(key)
