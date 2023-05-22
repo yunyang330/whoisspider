@@ -36,22 +36,26 @@ def open_txt():
     file=open('domain.txt','r',encoding='utf-8')
     file_data=file.readlines()
     for row in file_data:
-        tmp_list=row.split('.')
-        domains.append(tmp_list[0])
+        domains.append(row)
+    print(domains)
     return domains
 
 #调用搜索接口
 def url_get(domain):
     # 使用代理ip
-    tunnel = "tps827.kdlapi.com:15818"
+    proxy_host = 'http-dynamic.xiaoxiangdaili.com'
+    proxy_port = 10030
+    proxy_username = '973422222989742080'
+    proxy_pwd = 'PKH56rd5'
 
-    # 用户名密码认证(私密代理/独享代理)
-    username = "t15114368670956"
-    password = "jbyb1vkl"
-    # proxies = {
-    #     "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
-    #     "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
-    # }
+    proxyMeta = "http://%(user)s:%(pass)s@%(host)s:%(port)s" % {
+        "host": proxy_host,
+        "port": proxy_port,
+        "user": proxy_username,
+        "pass": proxy_pwd,
+    }
+
+
     # 设置请求头，模拟浏览器访问
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
@@ -63,16 +67,16 @@ def url_get(domain):
     keyword=domain
 
     #发送get请求
-    url = "https://api.knet.cn/whois"
+    url = "http://123.4.cn/api/main"
     parmas={"domain":keyword}
     retry_count=0
     while True:
         try:
             proxies = {
-                "http": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel},
-                "https": "http://%(user)s:%(pwd)s@%(proxy)s/" % {"user": username, "pwd": password, "proxy": tunnel}
+                'http': proxyMeta,
+                'https': proxyMeta,
             }
-            response = requests.get(url=url, headers=headers, params=parmas, proxies=proxies,timeout=timeout)
+            response = requests.get(url=url, headers=headers, params=parmas,proxies=proxies,timeout=timeout)
             if response.status_code == 200:
                 break
             else:
@@ -94,20 +98,24 @@ def url_get(domain):
 #解析接口返回的json数据
 def json_parse(res,domain):
     data=json.loads(res)
-    # print(data)
+    print(data)
     creation_data = ''
-    registry_expiry_date = ''
+    expire_date = ''
+    owner_name = ''
+    domain_match='域名格式不正确'
     #判断域名是否注册
-    status=data["msg"]
-    if status == 'match':
-        domain_match = '已注册'
-        creation_data=data["data"]["creation_date"]
-        # print(creation_data)
-        registry_expiry_date=data["data"]["registry_expiry_date"]
-        # print(registry_expiry_date)
-    else:
-        domain_match='无注册信息'
-    return domain_match,creation_data,registry_expiry_date
+    if data["retcode"]==0:
+        owner_name=data["data"]["owner_name"]
+        # print(owner_name)
+        if owner_name != '':
+            domain_match = '已注册'
+            creation_data=data["data"]["create_date"]
+            # print(creation_data)
+            expire_date=data["data"]["expire_date"]
+            # print(registry_expiry_date)
+        else:
+            domain_match='无注册信息'
+    return owner_name,domain_match,creation_data,expire_date
 
 #将域名信息存入表格
 def save_domian(match_infos,nomatch_infos):
@@ -131,12 +139,13 @@ def save_domian(match_infos,nomatch_infos):
 #爬虫主程序
 def main(domain):
     res = url_get(domain)
-    domain_match, creation_data, registry_expiry_date = json_parse(res, domain)
+    owner_name,domain_match, creation_data, registry_expiry_date = json_parse(res, domain)
     #将域名信息整理成列表
     match_info = []
     nomatch_info = []
     if domain_match == '已注册':
         match_info.append(domain)
+        match_info.append(owner_name)
         match_info.append(domain_match)
         match_info.append(creation_data)
         match_info.append(registry_expiry_date)
@@ -146,7 +155,7 @@ def main(domain):
         nomatch_info.append(domain_match)
         nomatch_info.append(creation_data)
         nomatch_info.append(registry_expiry_date)
-    print("已查询域名：{}.网址".format(domain))
+    print("已查询域名：{}".format(domain))
     return match_info,nomatch_info
 
 if __name__ == '__main__':
@@ -155,7 +164,7 @@ if __name__ == '__main__':
     nomatch_infos = []
     domains=open_txt()
     #多进程运行
-    with multiprocessing.Pool(processes=40) as pool:
+    with multiprocessing.Pool(processes=60) as pool:
         results = pool.map(main,domains)
         result1 = [r[0] for r in results]
         result2 = [r[1] for r in results]
